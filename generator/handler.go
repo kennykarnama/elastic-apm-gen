@@ -1,37 +1,24 @@
-package main
+package generator
 
 import (
+	"context"
 	"fmt"
-	"github.com/kennykarnama/elastic-apm-gen/helper"
-	"go/parser"
-	"go/token"
-	"os"
-	"strings"
-
-	"github.com/alexflint/go-arg"
 	"github.com/dave/dst"
-	"github.com/dave/dst/decorator"
+	"go/token"
+	"strings"
 )
 
-var args struct {
-	InputFile string `arg:"-i,--input-file" help:"input file"`
-	DryRun    bool   `arg:"--dry-run" help:"if true, it will print to stdout"`
+type Handler interface {
+	Handle(ctx context.Context, decoratedFile *dst.File) error
 }
 
-func main() {
-	arg.MustParse(&args)
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, args.InputFile, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
-	}
-	decoratedFile, err := decorator.DecorateFile(fset, file)
-	if err != nil {
-		panic(err)
-	}
-	for _, imp := range decoratedFile.Imports {
-		fmt.Println(imp.Name, imp.Path)
-	}
+type CommentBasedHandler struct{}
+
+func NewCommentBased() *CommentBasedHandler {
+	return &CommentBasedHandler{}
+}
+
+func (c *CommentBasedHandler) Handle(ctx context.Context, decoratedFile *dst.File) error {
 	hasApm := false
 	for _, f := range decoratedFile.Decls {
 		fn, ok := f.(*dst.FuncDecl)
@@ -105,24 +92,7 @@ func main() {
 		imports := map[string]string{
 			"apm": imp,
 		}
-		helper.AddImports(decoratedFile, imports)
+		addImports(decoratedFile, imports)
 	}
-
-	if err := decorator.Print(decoratedFile); err != nil {
-		panic(err)
-	}
-	ToFile(decoratedFile)
-
-}
-
-func ToFile(decoratedFile *dst.File) {
-	f, err := os.Create("refactored.go")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	if err := decorator.Fprint(f, decoratedFile); err != nil {
-		panic(err)
-	}
+	return nil
 }
