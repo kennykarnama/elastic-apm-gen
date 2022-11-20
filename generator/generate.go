@@ -2,24 +2,23 @@ package generator
 
 import (
 	"context"
-	"github.com/dave/dst/decorator"
-	"io"
 )
 
 type Generate interface {
-	Process(ctx context.Context, out io.Writer) error
+	Process(ctx context.Context) error
 }
 
 type GenericGenerator struct {
 	handler Handler
 	parser  Parser
+	flusher Flusher
 }
 
-func NewGenericGenerator(handler Handler, parser Parser) *GenericGenerator {
-	return &GenericGenerator{handler: handler, parser: parser}
+func NewGenericGenerator(handler Handler, parser Parser, flusher Flusher) *GenericGenerator {
+	return &GenericGenerator{handler: handler, parser: parser, flusher: flusher}
 }
 
-func (g *GenericGenerator) Process(ctx context.Context, out io.Writer) error {
+func (g *GenericGenerator) Process(ctx context.Context) error {
 	decoratedFile, err := g.parser.Get(ctx)
 	if err != nil {
 		return err
@@ -28,7 +27,7 @@ func (g *GenericGenerator) Process(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	err = decorator.Fprint(out, decoratedFile)
+	err = g.flusher.Write(ctx, decoratedFile)
 	if err != nil {
 		return err
 	}

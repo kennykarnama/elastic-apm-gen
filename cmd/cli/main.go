@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
-	"os"
-
 	"github.com/alexflint/go-arg"
 	"github.com/kennykarnama/elastic-apm-gen/generator"
 )
@@ -22,16 +19,14 @@ func main() {
 	arg.MustParse(&args)
 	ctx := context.Background()
 	parser := generator.NewParser(args.Input)
-	var out io.Writer
+	var out generator.Flusher
 	if args.DryRun {
-		out = os.Stdout
+		out = &generator.StdOutFlusher{}
 	} else {
-		f, err := os.Create(args.Output)
-		if err != nil {
-			panic(err)
+		if args.Output == "" {
+			args.Output = args.Input
 		}
-		defer f.Close()
-		out = f
+		out = generator.NewFileFlusher(args.Output)
 	}
 	var gen generator.Generate
 	var handler generator.Handler
@@ -39,8 +34,8 @@ func main() {
 	case args.CommentModeCmd != nil:
 		handler = generator.NewCommentBased()
 	}
-	gen = generator.NewGenericGenerator(handler, parser)
-	err := gen.Process(ctx, out)
+	gen = generator.NewGenericGenerator(handler, parser, out)
+	err := gen.Process(ctx)
 	if err != nil {
 		panic(err)
 	}
